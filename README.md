@@ -3,6 +3,8 @@
   <h1>Orbital Logis &middot; GAIE</h1>
   <p><strong>Global Asteroid Intelligence Engine</strong></p>
   <p>Prevenção da Síndrome de Kessler com Machine Learning e dados da NASA (ODS 9).</p>
+  <br/>
+  <a href="https://jzampieri-global-solution-ai-app-e1ulx4.streamlit.app/"><strong>🔗 Acessar Aplicação Online</strong></a>
 </div>
 
 ---
