@@ -49,8 +49,8 @@ O ambiente foi padronizado em um isolamento de dependências (`requirements.txt`
 
 ```bash
 # 1. Clone o repositório
-git clone https://github.com/SEU-USUARIO/orbital-logis-gaie.git
-cd orbital-logis-gaie
+git clone https://github.com/jzampieri/global-solution-AI
+cd global-solution-AI
 
 # 2. Crie e ative o ambiente virtual
 python -m venv .venv
