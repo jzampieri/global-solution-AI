@@ -355,7 +355,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-NASA_API_KEY = "DEMO_KEY"   NASA_NEO_URL = "https://api.nasa.gov/neo/rest/v1/feed"
+NASA_API_KEY = "DEMO_KEY"
+NASA_NEO_URL = "https://api.nasa.gov/neo/rest/v1/feed"
 
 FEATURES = [
     "estimated_diameter_min_km",
@@ -446,17 +447,18 @@ def train_models(df: pd.DataFrame):
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled  = scaler.transform(X_test)
 
-        rf = RandomForestClassifier(
+    rf = RandomForestClassifier(
         n_estimators=200,
         max_depth=10,
-        class_weight="balanced",           random_state=42,
+        class_weight="balanced",
+        random_state=42,
         n_jobs=-1,
     )
     rf.fit(X_train, y_train)
     rf_pred  = rf.predict(X_test)
     rf_proba = rf.predict_proba(X_test)[:, 1]
 
-        lr = LogisticRegression(
+    lr = LogisticRegression(
         max_iter=1000,
         class_weight="balanced",
         random_state=42,
@@ -466,7 +468,7 @@ def train_models(df: pd.DataFrame):
     lr_pred  = lr.predict(X_test_scaled)
     lr_proba = lr.predict_proba(X_test_scaled)[:, 1]
 
-        metrics = {
+    metrics = {
         "Random Forest": {
             "accuracy":round(accuracy_score(y_test, rf_pred),  4),
             "f1":round(f1_score(y_test, rf_pred, zero_division=0), 4),
@@ -565,7 +567,7 @@ def predict_single(
 
 def main():
 
-        st.markdown("""
+    st.markdown("""
     <div class="hero-header">
       <p class="hero-eyebrow">Global Solution 2026 &mdash; FIAP</p>
       <p class="hero-title">Orbital Logis &middot; GAIE</p>
@@ -577,7 +579,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-        st.markdown("""
+    st.markdown("""
     <div class="info-box">
       <strong>Síndrome de Kessler:</strong> A proliferação de detritos orbitais pode tornar certas
       órbitas inutilizáveis em cascata, ameaçando satélites de comunicação, GPS e monitoramento climático
@@ -587,7 +589,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-                with st.sidebar:
+    with st.sidebar:
         st.markdown("## Configurações")
         api_key = st.text_input(
             "Chave API NASA",
@@ -621,7 +623,7 @@ def main():
             unsafe_allow_html=True,
         )
 
-                if run_button or ("df" not in st.session_state):
+    if run_button or ("df" not in st.session_state):
         if run_button:
             st.session_state.pop("df", None)
             st.session_state.pop("models_ready", None)
@@ -639,7 +641,7 @@ def main():
         st.session_state.pop("models_ready", None)   
     df = st.session_state["df"]
 
-        st.markdown('<p class="section-header">Dataset &mdash; NASA Near Earth Objects</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header">Dataset &mdash; NASA Near Earth Objects</p>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
 
     hazardous_count = int(df[TARGET].sum())
@@ -682,7 +684,7 @@ def main():
             use_container_width=True,
         )
 
-                if "models_ready" not in st.session_state:
+    if "models_ready" not in st.session_state:
         if len(df) < 50:
             st.error(f"Dataset insuficiente ({len(df)} linhas). Aumente a janela de coleta ou verifique a API.")
             st.stop()
@@ -705,7 +707,7 @@ def main():
     splits  = st.session_state["splits"]
     metrics = st.session_state["metrics"]
 
-        st.markdown('<p class="section-header">Comparativo de Modelos</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header">Comparativo de Modelos</p>', unsafe_allow_html=True)
 
     col_rf, col_lr = st.columns(2)
 
@@ -755,7 +757,7 @@ def main():
     )
     st.info(f"**Melhor modelo:** {best_model_name} — AUC-ROC: {metrics[best_model_name]['auc_roc']:.2%}")
 
-                st.markdown('<p class="section-header">SHAP &mdash; Explicabilidade do Melhor Modelo</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header">SHAP &mdash; Explicabilidade do Melhor Modelo</p>', unsafe_allow_html=True)
 
     st.markdown("""
     <div class="info-box">
@@ -779,7 +781,7 @@ def main():
         "Eixo X = impacto na predicao de Risco Critico"
     )
 
-                st.markdown('<p class="section-header">Predicao em Tempo Real</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header">Predicao em Tempo Real</p>', unsafe_allow_html=True)
 
     if dmax < dmin:
         st.warning("Diametro maximo deve ser maior ou igual ao diametro minimo.")
@@ -833,7 +835,7 @@ def main():
             })
             st.dataframe(params_df, use_container_width=True, hide_index=True)
 
-                st.markdown("---")
+    st.markdown("---")
     st.markdown("""
     <div style="text-align:center; color:#aaaaaa; font-size:0.78rem; margin-top:1rem; letter-spacing:0.3px;">
       <strong style="color:#888888;">ORBITAL LOGIS &middot; GAIE</strong> &mdash; Global Solution 2026 &middot; FIAP<br/>
