@@ -68,3 +68,5 @@ streamlit run app.py
 ```
 
 O dashboard será aberto automaticamente em `http://localhost:8501`. Na barra lateral, você pode configurar a janela de coleta dos dados da NASA e testar predições manuais no formulário.
+
+> **⚠️ Aviso sobre a API da NASA:** Na primeira execução, a aplicação utiliza a chave padrão `DEMO_KEY` para demonstração rápida. Se você recarregar os dados muitas vezes ou exceder o limite de requisições por hora da NASA, será necessário gerar sua própria chave gratuita no portal oficial (https://api.nasa.gov/) e inseri-la no campo disponível na barra lateral do painel.
