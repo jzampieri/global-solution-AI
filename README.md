@@ -12,12 +12,12 @@ O **GAIE (Global Asteroid Intelligence Engine)** é a camada de inteligência do
 
 Através do consumo da API pública **NASA NeoWs**, o modelo coleta dados reais e classifica os asteroides em **Risco Crítico** ou **Risco Baixo**. A aplicação é construída de ponta a ponta em Python e disponibilizada via Streamlit.
 
-## 2. Equipe e Identificação
+## 2. Alunos Participantes
 Projeto desenvolvido para a Global Solution 2026 (FIAP) - Engenharia de Software (4º Ano).
 
-* **Nome do Integrante 1** - RM: 00000
-* **Nome do Integrante 2** - RM: 00000
-* *(Preencher demais integrantes e RMs)*
+* **Júlio César Zampieri** - RM98772
+* **João Gabriel Dias** - RM99092
+* **Ricardo Matos** - RM95906
 
 ## 3. Metodologia
 A construção da solução foi dividida nas seguintes etapas do pipeline de dados:
