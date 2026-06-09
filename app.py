@@ -350,13 +350,7 @@ st.markdown("""
   hr { border-color: #e8e8e8; }
 
   /* Botão retrátil da sidebar */
-  [data-testid="collapsedControl"] {
-    color: #111111 !important;
-    background-color: #e8e8e8 !important;
-  }
-
-  [data-testid="collapsedControl"] svg {
-    fill: #111111 !important;
+  [data-testid="stIconMaterial"] {
     color: #111111 !important;
   }
 
