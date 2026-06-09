@@ -718,24 +718,23 @@ def main():
             unsafe_allow_html=True,
         )
 
-    if run_button or ("df" not in st.session_state):
-        if run_button:
-            st.session_state.pop("df", None)
-            st.session_state.pop("models_ready", None)
-            st.session_state.pop("shap_fig", None)
-            st.session_state.pop("visual_figs", None)
-
-    if "df" not in st.session_state:
+    if run_button:
+        st.session_state.pop("df", None)
+        st.session_state.pop("models_ready", None)
+        st.session_state.pop("shap_fig", None)
+        st.session_state.pop("visual_figs", None)
         with st.spinner("Buscando dados de asteroides na API NeoWs da NASA..."):
             raw_df = fetch_neo_data(api_key=api_key, days_back=days_back)
-
         if raw_df.empty:
             st.error("Nenhum dado retornado pela API. Verifique sua chave ou conexão.")
             st.stop()
-
         clean_df = preprocess_data(raw_df)
         st.session_state["df"] = clean_df
-        st.session_state.pop("models_ready", None)   
+
+    if "df" not in st.session_state:
+        st.info("⚙️ Configure sua chave da API NASA na barra lateral e clique em **Executar Análise** para iniciar.")
+        st.stop()
+
     df = st.session_state["df"]
 
     st.markdown('<p class="section-header">Dataset &mdash; NASA Near Earth Objects</p>', unsafe_allow_html=True)
