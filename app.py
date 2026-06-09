@@ -13,12 +13,13 @@ import matplotlib
 matplotlib.use("Agg") 
 
 from datetime import datetime, timedelta
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
-    accuracy_score, f1_score, roc_auc_score, classification_report
+    accuracy_score, f1_score, roc_auc_score, confusion_matrix, roc_curve,
 )
 import shap
 import warnings
@@ -434,7 +435,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
 
 def train_models(df: pd.DataFrame):
     """
-    Treina os classificadores.
+    Treina tres classificadores com validação cruzada 5-fold.
     """
     X = df[FEATURES].values
     y = df[TARGET].values
@@ -447,50 +448,79 @@ def train_models(df: pd.DataFrame):
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled  = scaler.transform(X_test)
 
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    # Random Forest
     rf = RandomForestClassifier(
-        n_estimators=200,
-        max_depth=10,
-        class_weight="balanced",
-        random_state=42,
-        n_jobs=-1,
+        n_estimators=200, max_depth=10,
+        class_weight="balanced", random_state=42, n_jobs=-1,
     )
     rf.fit(X_train, y_train)
     rf_pred  = rf.predict(X_test)
     rf_proba = rf.predict_proba(X_test)[:, 1]
+    rf_cv    = cross_val_score(rf, X, y, cv=cv, scoring="roc_auc", n_jobs=-1)
 
+    # Logistic Regression (pipeline com scaler para CV correta)
     lr = LogisticRegression(
-        max_iter=1000,
-        class_weight="balanced",
-        random_state=42,
-        solver="lbfgs",
+        max_iter=1000, class_weight="balanced",
+        random_state=42, solver="lbfgs",
     )
     lr.fit(X_train_scaled, y_train)
     lr_pred  = lr.predict(X_test_scaled)
     lr_proba = lr.predict_proba(X_test_scaled)[:, 1]
+    lr_pipe  = Pipeline([("scaler", StandardScaler()), ("lr", LogisticRegression(
+        max_iter=1000, class_weight="balanced", random_state=42, solver="lbfgs"
+    ))])
+    lr_cv    = cross_val_score(lr_pipe, X, y, cv=cv, scoring="roc_auc", n_jobs=-1)
+
+    # Gradient Boosting
+    gb = GradientBoostingClassifier(
+        n_estimators=150, max_depth=4, learning_rate=0.1, random_state=42,
+    )
+    gb.fit(X_train, y_train)
+    gb_pred  = gb.predict(X_test)
+    gb_proba = gb.predict_proba(X_test)[:, 1]
+    gb_cv    = cross_val_score(gb, X, y, cv=cv, scoring="roc_auc", n_jobs=-1)
 
     metrics = {
         "Random Forest": {
-            "accuracy":round(accuracy_score(y_test, rf_pred),  4),
-            "f1":round(f1_score(y_test, rf_pred, zero_division=0), 4),
-            "auc_roc":round(roc_auc_score(y_test, rf_proba),  4),
+            "accuracy":    round(accuracy_score(y_test, rf_pred), 4),
+            "f1":          round(f1_score(y_test, rf_pred, zero_division=0), 4),
+            "auc_roc":     round(roc_auc_score(y_test, rf_proba), 4),
+            "cv_auc_mean": round(rf_cv.mean(), 4),
+            "cv_auc_std":  round(rf_cv.std(), 4),
         },
         "Logistic Regression": {
-            "accuracy":round(accuracy_score(y_test, lr_pred),  4),
-            "f1":round(f1_score(y_test, lr_pred, zero_division=0), 4),
-            "auc_roc":round(roc_auc_score(y_test, lr_proba),  4),
+            "accuracy":    round(accuracy_score(y_test, lr_pred), 4),
+            "f1":          round(f1_score(y_test, lr_pred, zero_division=0), 4),
+            "auc_roc":     round(roc_auc_score(y_test, lr_proba), 4),
+            "cv_auc_mean": round(lr_cv.mean(), 4),
+            "cv_auc_std":  round(lr_cv.std(), 4),
+        },
+        "Gradient Boosting": {
+            "accuracy":    round(accuracy_score(y_test, gb_pred), 4),
+            "f1":          round(f1_score(y_test, gb_pred, zero_division=0), 4),
+            "auc_roc":     round(roc_auc_score(y_test, gb_proba), 4),
+            "cv_auc_mean": round(gb_cv.mean(), 4),
+            "cv_auc_std":  round(gb_cv.std(), 4),
         },
     }
 
     splits = {
-        "X_train":X_train,
-        "X_test":X_test,
-        "y_train":y_train,
-        "y_test":y_test,
-        "X_train_scaled":X_train_scaled,
-        "X_test_scaled":X_test_scaled,
+        "X_train":        X_train,
+        "X_test":         X_test,
+        "y_train":        y_train,
+        "y_test":         y_test,
+        "X_train_scaled": X_train_scaled,
+        "X_test_scaled":  X_test_scaled,
+        "predictions": {
+            "Random Forest":       (rf_pred, rf_proba),
+            "Logistic Regression": (lr_pred, lr_proba),
+            "Gradient Boosting":   (gb_pred, gb_proba),
+        },
     }
 
-    return rf, lr, scaler, splits, metrics
+    return rf, lr, gb, scaler, splits, metrics
 
 def generate_shap_plot(model, X_train: np.ndarray, feature_names: list) -> plt.Figure:
     """
@@ -539,6 +569,71 @@ def generate_shap_plot(model, X_train: np.ndarray, feature_names: list) -> plt.F
     )
     plt.tight_layout()
     return fig
+
+def generate_visual_plots(splits: dict, metrics: dict) -> dict:
+    """
+    Gera curvas ROC comparativas e matrizes de confusão para todos os modelos.
+    """
+    plt.close("all")
+    y_test      = splits["y_test"]
+    predictions = splits["predictions"]
+    model_names = list(predictions.keys())
+    colors      = ["#111111", "#e07b00", "#1a7a4a"]
+
+    # --- Curvas ROC ---
+    fig_roc, ax_roc = plt.subplots(figsize=(7, 5))
+    fig_roc.patch.set_facecolor("#ffffff")
+    ax_roc.set_facecolor("#f7f7f7")
+
+    for (model_name, (pred, proba)), color in zip(predictions.items(), colors):
+        fpr, tpr, _ = roc_curve(y_test, proba)
+        auc_val = metrics[model_name]["auc_roc"]
+        ax_roc.plot(fpr, tpr, label=f"{model_name} (AUC={auc_val:.3f})", color=color, lw=2)
+
+    ax_roc.plot([0, 1], [0, 1], "k--", lw=1, alpha=0.4, label="Aleatório (AUC=0.500)")
+    ax_roc.set_xlabel("Taxa de Falsos Positivos", color="#333333")
+    ax_roc.set_ylabel("Taxa de Verdadeiros Positivos", color="#333333")
+    ax_roc.set_title("Curvas ROC — Comparativo de Modelos", color="#111111", fontweight="bold", fontsize=12)
+    ax_roc.legend(loc="lower right", fontsize=9)
+    ax_roc.tick_params(colors="#555555")
+    for spine in ax_roc.spines.values():
+        spine.set_edgecolor("#dddddd")
+    plt.tight_layout()
+
+    # --- Matrizes de Confusão ---
+    fig_cm, axes = plt.subplots(1, 3, figsize=(14, 4))
+    fig_cm.patch.set_facecolor("#ffffff")
+
+    for i, (model_name, color) in enumerate(zip(model_names, colors)):
+        pred, _ = predictions[model_name]
+        cm = confusion_matrix(y_test, pred)
+        ax = axes[i]
+        ax.set_facecolor("#ffffff")
+        ax.imshow(cm, interpolation="nearest", cmap="Greys")
+        ax.set_title(model_name, color="#111111", fontweight="bold", fontsize=10)
+        ax.set_xlabel("Predito", color="#333333", fontsize=9)
+        ax.set_ylabel("Real", color="#333333", fontsize=9)
+        ax.set_xticks([0, 1])
+        ax.set_yticks([0, 1])
+        ax.set_xticklabels(["Baixo Risco", "Risco Crítico"], color="#333333", fontsize=8)
+        ax.set_yticklabels(["Baixo Risco", "Risco Crítico"], color="#333333", fontsize=8)
+        ax.tick_params(colors="#555555")
+        for spine in ax.spines.values():
+            spine.set_edgecolor("#dddddd")
+        thresh = cm.max() / 2.0
+        for row in range(2):
+            for col in range(2):
+                ax.text(
+                    col, row, str(cm[row, col]),
+                    ha="center", va="center", fontsize=16, fontweight="bold",
+                    color="white" if cm[row, col] > thresh else "#111111",
+                )
+
+    fig_cm.suptitle("Matrizes de Confusão — Conjunto de Teste", color="#111111", fontweight="bold", fontsize=12, y=1.02)
+    plt.tight_layout()
+
+    return {"roc": fig_roc, "cm": fig_cm}
+
 
 def predict_single(
     rf_model,
@@ -627,6 +722,8 @@ def main():
         if run_button:
             st.session_state.pop("df", None)
             st.session_state.pop("models_ready", None)
+            st.session_state.pop("shap_fig", None)
+            st.session_state.pop("visual_figs", None)
 
     if "df" not in st.session_state:
         with st.spinner("Buscando dados de asteroides na API NeoWs da NASA..."):
@@ -689,13 +786,14 @@ def main():
             st.error(f"Dataset insuficiente ({len(df)} linhas). Aumente a janela de coleta ou verifique a API.")
             st.stop()
 
-        with st.spinner("Treinando Random Forest e Regressão Logística..."):
-            rf, lr, scaler, splits, metrics = train_models(df)
+        with st.spinner("Treinando 3 modelos com validação cruzada 5-fold..."):
+            rf, lr, gb, scaler, splits, metrics = train_models(df)
 
         st.session_state.update({
             "models_ready": True,
             "rf":           rf,
             "lr":           lr,
+            "gb":           gb,
             "scaler":       scaler,
             "splits":       splits,
             "metrics":      metrics,
@@ -703,15 +801,16 @@ def main():
 
     rf      = st.session_state["rf"]
     lr      = st.session_state["lr"]
+    gb      = st.session_state["gb"]
     scaler  = st.session_state["scaler"]
     splits  = st.session_state["splits"]
     metrics = st.session_state["metrics"]
 
     st.markdown('<p class="section-header">Comparativo de Modelos</p>', unsafe_allow_html=True)
 
-    col_rf, col_lr = st.columns(2)
+    col_rf, col_lr, col_gb = st.columns(3)
 
-    for col, model_name in zip([col_rf, col_lr], ["Random Forest", "Logistic Regression"]):
+    for col, model_name in zip([col_rf, col_lr, col_gb], ["Random Forest", "Logistic Regression", "Gradient Boosting"]):
         m = metrics[model_name]
         color_acc = "good" if m["accuracy"] >= 0.85 else "mid"
         color_f1  = "good" if m["f1"]       >= 0.75 else "warn"
@@ -740,10 +839,19 @@ def main():
                 </div>""", unsafe_allow_html=True)
 
     st.markdown("")
-    metrics_df = pd.DataFrame(metrics).T.rename_axis("Modelo").reset_index()
-    metrics_df.columns = ["Modelo", "Acurácia", "F1-Score", "AUC-ROC"]
+    metrics_rows = []
+    for model_name, m in metrics.items():
+        metrics_rows.append({
+            "Modelo": model_name,
+            "Acurácia": m["accuracy"],
+            "F1-Score": m["f1"],
+            "AUC-ROC (teste)": m["auc_roc"],
+            "AUC-ROC CV (média)": m["cv_auc_mean"],
+            "CV ± std": m["cv_auc_std"],
+        })
+    metrics_df = pd.DataFrame(metrics_rows)
 
-    best_model_name = metrics_df.loc[metrics_df["AUC-ROC"].idxmax(), "Modelo"]
+    best_model_name = metrics_df.loc[metrics_df["AUC-ROC (teste)"].idxmax(), "Modelo"]
 
     def highlight_best(row):
         return ["background-color: rgba(0,212,160,0.12); font-weight:700;" if row["Modelo"] == best_model_name else "" for _ in row]
@@ -751,11 +859,46 @@ def main():
     st.dataframe(
         metrics_df.style
             .apply(highlight_best, axis=1)
-            .format({"Acurácia": "{:.2%}", "F1-Score": "{:.2%}", "AUC-ROC": "{:.2%}"}),
+            .format({
+                "Acurácia": "{:.2%}",
+                "F1-Score": "{:.2%}",
+                "AUC-ROC (teste)": "{:.2%}",
+                "AUC-ROC CV (média)": "{:.2%}",
+                "CV ± std": "{:.4f}",
+            }),
         use_container_width=True,
         hide_index=True,
     )
-    st.info(f"**Melhor modelo:** {best_model_name} — AUC-ROC: {metrics[best_model_name]['auc_roc']:.2%}")
+    st.info(f"**Melhor modelo:** {best_model_name} — AUC-ROC teste: {metrics[best_model_name]['auc_roc']:.2%} | CV 5-fold: {metrics[best_model_name]['cv_auc_mean']:.2%} ± {metrics[best_model_name]['cv_auc_std']:.4f}")
+
+    st.markdown('<p class="section-header">Avaliação Visual dos Modelos</p>', unsafe_allow_html=True)
+
+    if "visual_figs" not in st.session_state:
+        with st.spinner("Gerando curvas ROC e matrizes de confusão..."):
+            visual_figs = generate_visual_plots(splits, metrics)
+            st.session_state["visual_figs"] = visual_figs
+
+    visual_figs = st.session_state["visual_figs"]
+
+    tab_roc, tab_cm = st.tabs(["Curvas ROC", "Matrizes de Confusão"])
+
+    with tab_roc:
+        st.markdown('<div class="plot-container">', unsafe_allow_html=True)
+        st.pyplot(visual_figs["roc"], use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.caption(
+            "Cada curva mostra o trade-off entre Verdadeiros Positivos e Falsos Positivos. "
+            "Quanto mais próxima do canto superior esquerdo, melhor o modelo."
+        )
+
+    with tab_cm:
+        st.markdown('<div class="plot-container">', unsafe_allow_html=True)
+        st.pyplot(visual_figs["cm"], use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.caption(
+            "Diagonal principal = acertos. Fora da diagonal = erros. "
+            "Falsos Negativos (linha 1, col 0) são críticos: objeto perigoso classificado como seguro."
+        )
 
     st.markdown('<p class="section-header">SHAP &mdash; Explicabilidade do Melhor Modelo</p>', unsafe_allow_html=True)
 
@@ -840,8 +983,8 @@ def main():
     <div style="text-align:center; color:#aaaaaa; font-size:0.78rem; margin-top:1rem; letter-spacing:0.3px;">
       <strong style="color:#888888;">ORBITAL LOGIS &middot; GAIE</strong> &mdash; Global Solution 2026 &middot; FIAP<br/>
       Dados: <a href="https://api.nasa.gov/" style="color:#666666; text-decoration:underline;">NASA NeoWs API</a>
-      &nbsp;&middot;&nbsp; Modelos: Random Forest &amp; Logistic Regression
-      &nbsp;&middot;&nbsp; Explicabilidade: SHAP &nbsp;&middot;&nbsp; ODS 9
+      &nbsp;&middot;&nbsp; Modelos: Random Forest &amp; Logistic Regression &amp; Gradient Boosting
+      &nbsp;&middot;&nbsp; CV 5-fold &nbsp;&middot;&nbsp; Explicabilidade: SHAP &nbsp;&middot;&nbsp; ODS 9
     </div>
     """, unsafe_allow_html=True)
 
