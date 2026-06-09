@@ -349,6 +349,17 @@ st.markdown("""
   /* Divider */
   hr { border-color: #e8e8e8; }
 
+  /* Botão retrátil da sidebar */
+  [data-testid="collapsedControl"] {
+    color: #111111 !important;
+    background-color: #e8e8e8 !important;
+  }
+
+  [data-testid="collapsedControl"] svg {
+    fill: #111111 !important;
+    color: #111111 !important;
+  }
+
   /* Table */
   table { width: 100% !important; }
   th { background: #f0f0f0 !important; color: #111111 !important; font-weight: 600 !important; }
